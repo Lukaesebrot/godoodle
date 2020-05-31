@@ -64,3 +64,51 @@ func (client *Client) CreditsSpent() (int64, error) {
 	}
 	return responseStruct.Used, nil
 }
+
+// Execute executes the given script
+func (client *Client) Execute(script, stdin, language, versionIndex string) (*Response, error) {
+	// Acquire a request object
+	request := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(request)
+
+	// Acquire a response object
+	response := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(response)
+
+	// Prepare the request object
+	request.SetRequestURI(EndpointExecute)
+	request.Header.SetMethod("POST")
+	request.Header.SetContentType("application/json")
+	request.PostArgs().Set("clientId", client.clientID)
+	request.PostArgs().Set("clientSecret", client.clientSecret)
+	request.PostArgs().Set("script", script)
+	request.PostArgs().Set("stdin", stdin)
+	request.PostArgs().Set("language", language)
+	request.PostArgs().Set("versionIndex", versionIndex)
+
+	// Perform the request
+	err := client.http.Do(request, response)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the response into a json struct
+	var responseStruct struct {
+		Error string `json:"error,omitempty"`
+	}
+	err = json.Unmarshal(response.Body(), &responseStruct)
+	if err != nil {
+		return nil, err
+	}
+	if responseStruct.Error != "" {
+		return nil, errors.New(responseStruct.Error)
+	}
+
+	// Return the corresponding response object
+	resp := new(Response)
+	err = json.Unmarshal(response.Body(), &resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
